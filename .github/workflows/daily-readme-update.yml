@@ -1,0 +1,66 @@
+name: Daily README Date Update
+
+on:
+  schedule:
+    # Runs every day at midnight UTC
+    - cron: "0 0 * * *"
+  workflow_dispatch: # Allow manual trigger
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-readme:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Update README with today's date
+        run: |
+          TODAY=$(date +"%m/%d/%Y")
+          echo "$TODAY" > README.md
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create branch, commit, and push
+        id: push
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          TODAY=$(date +"%m/%d/%Y")
+          BRANCH="auto-update/readme-date-$(date +%Y-%m-%d)"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add README.md
+          git commit -m "Update README with today's date: $TODAY"
+          git push origin "$BRANCH"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "today=$TODAY" >> "$GITHUB_OUTPUT"
+
+      - name: Create Pull Request
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          gh pr create \
+            --title "Update README date to ${{ steps.push.outputs.today }}" \
+            --body "Automated daily update of the README with today's date: **${{ steps.push.outputs.today }}**" \
+            --head "${{ steps.push.outputs.branch }}" \
+            --base main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Merge Pull Request
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          gh pr merge "${{ steps.push.outputs.branch }}" --merge --auto
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
