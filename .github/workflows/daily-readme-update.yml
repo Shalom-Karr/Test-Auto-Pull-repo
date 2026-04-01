@@ -33,6 +33,7 @@ jobs:
           fi
 
       - name: Create branch, commit, and push
+        id: push
         if: steps.changes.outputs.changed == 'true'
         run: |
           TODAY=$(date +"%m/%d/%Y")
@@ -45,7 +46,6 @@ jobs:
           git push origin "$BRANCH"
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
           echo "today=$TODAY" >> "$GITHUB_OUTPUT"
-        id: push
 
       - name: Create Pull Request
         if: steps.changes.outputs.changed == 'true'
