@@ -75,6 +75,6 @@ jobs:
       - name: Merge Pull Request
         if: steps.changes.outputs.changed == 'true'
         run: |
-          gh pr merge "${{ steps.push.outputs.branch }}" --merge --auto
+          gh pr merge "${{ steps.push.outputs.branch }}" --merge
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
