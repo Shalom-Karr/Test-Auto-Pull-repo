@@ -2,9 +2,8 @@ name: Daily README Date Update
 
 on:
   schedule:
-    # Runs every day at midnight UTC
     - cron: "0 0 * * *"
-  workflow_dispatch: # Allow manual trigger
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -17,6 +16,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history so we can see remote branches
 
       - name: Update README with today's date
         run: |
@@ -40,6 +41,13 @@ jobs:
           BRANCH="auto-update/readme-date-$(date +%Y-%m-%d)"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Delete the remote branch if it already exists
+          if git ls-remote --exit-code origin "refs/heads/$BRANCH" > /dev/null 2>&1; then
+            echo "Branch $BRANCH already exists on remote. Deleting it."
+            git push origin --delete "$BRANCH"
+          fi
+
           git checkout -b "$BRANCH"
           git add README.md
           git commit -m "Update README with today's date: $TODAY"
@@ -50,11 +58,17 @@ jobs:
       - name: Create Pull Request
         if: steps.changes.outputs.changed == 'true'
         run: |
-          gh pr create \
-            --title "Update README date to ${{ steps.push.outputs.today }}" \
-            --body "Automated daily update of the README with today's date: **${{ steps.push.outputs.today }}**" \
-            --head "${{ steps.push.outputs.branch }}" \
-            --base main
+          # Only create a PR if one doesn't already exist for this branch
+          EXISTING_PR=$(gh pr list --head "${{ steps.push.outputs.branch }}" --json number --jq '.[0].number')
+          if [ -z "$EXISTING_PR" ]; then
+            gh pr create \
+              --title "Update README date to ${{ steps.push.outputs.today }}" \
+              --body "Automated daily update of the README with today's date: **${{ steps.push.outputs.today }}**" \
+              --head "${{ steps.push.outputs.branch }}" \
+              --base main
+          else
+            echo "PR #$EXISTING_PR already exists for this branch. Skipping creation."
+          fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
