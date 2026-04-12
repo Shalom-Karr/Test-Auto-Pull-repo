@@ -56,25 +56,31 @@ jobs:
           echo "today=$TODAY" >> "$GITHUB_OUTPUT"
 
       - name: Create Pull Request
+        id: create_pr
         if: steps.changes.outputs.changed == 'true'
         run: |
           # Only create a PR if one doesn't already exist for this branch
           EXISTING_PR=$(gh pr list --head "${{ steps.push.outputs.branch }}" --json number --jq '.[0].number')
           if [ -z "$EXISTING_PR" ]; then
-            gh pr create \
+            PR_URL=$(gh pr create \
               --title "Update README date to ${{ steps.push.outputs.today }}" \
               --body "Automated daily update of the README with today's date: **${{ steps.push.outputs.today }}**" \
               --head "${{ steps.push.outputs.branch }}" \
-              --base main
+              --base main)
+            PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
           else
             echo "PR #$EXISTING_PR already exists for this branch. Skipping creation."
+            PR_NUMBER=$EXISTING_PR
           fi
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Merge Pull Request
-        if: steps.changes.outputs.changed == 'true'
+        if: steps.changes.outputs.changed == 'true' && steps.create_pr.outputs.pr_number != ''
         run: |
-          gh pr merge "${{ steps.push.outputs.branch }}" --merge
+          # Wait briefly for the PR to be fully available
+          sleep 5
+          gh pr merge ${{ steps.create_pr.outputs.pr_number }} --merge
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
